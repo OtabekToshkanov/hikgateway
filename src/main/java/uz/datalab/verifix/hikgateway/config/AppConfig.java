@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
-public class Config {
+public class AppConfig {
     @Bean
     public OkHttpClient hikHttpClient(HikProperties properties) {
         DigestAuthenticator authenticator = new DigestAuthenticator(new Credentials(properties.getUsername(), properties.getPassword()));

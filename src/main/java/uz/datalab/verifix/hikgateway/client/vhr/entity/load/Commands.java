@@ -14,6 +14,8 @@ import java.util.List;
 public class Commands {
     @JsonProperty("commands_list")
     private List<Command> commands;
+    @JsonProperty("operation_mode")
+    private String operationMode;
 
     public Commands() {
         commands = new ArrayList<>();

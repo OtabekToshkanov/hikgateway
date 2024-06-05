@@ -2,9 +2,12 @@ package uz.datalab.verifix.hikgateway.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import uz.datalab.verifix.hikgateway.client.hik.HikClient;
 import uz.datalab.verifix.hikgateway.client.hik.entity.HikResult;
@@ -13,7 +16,6 @@ import uz.datalab.verifix.hikgateway.client.hik.entity.deviceadd.response.Device
 import uz.datalab.verifix.hikgateway.client.hik.entity.devicedel.response.DeviceDelResponse;
 import uz.datalab.verifix.hikgateway.client.vhr.VHRClient;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Command;
-import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Commands;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Photo;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.SetPhotoCommandBody;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.save.CommandResult;
@@ -22,59 +24,44 @@ import uz.datalab.verifix.hikgateway.entity.Middleware;
 import uz.datalab.verifix.hikgateway.service.AppService;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @RequiredArgsConstructor
 @Component
+@Scope("prototype")
 public class CommandExecutor {
     private static final Logger log = LoggerFactory.getLogger(CommandExecutor.class);
     private final AppService appService;
     private final VHRClient vhrClient;
     private final HikClient hikClient;
     private final ObjectMapper objectMapper;
+    private ExecutorService executor;
 
-    public void executeCommands(Middleware middleware, long deviceId, Commands commands) {
-        commands.getCommands().forEach(command -> {
+    @PostConstruct
+    public void init() {
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+    }
+
+    @PreDestroy
+    public void destroy() {
+        executor.shutdown();
+    }
+
+    public void executeCommandsSequentially(Middleware middleware, long deviceId, List<Command> commands) {
+        commands.forEach(command -> {
             CommandResult commandResult = executeCommand(middleware, deviceId, command);
             CommandsResult result = new CommandsResult(commandResult);
             vhrClient.saveCommands(middleware, result);
         });
     }
 
-    public CommandsResult executeCommandsConcurrently(Middleware middleware, long deviceId, Commands commands) {
-        CommandsResult result = new CommandsResult();
-
-        // Create a virtual thread executor
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            // Create a list of CompletableFutures for executing each command asynchronously
-            List<CompletableFuture<CommandResult>> futures = commands.getCommands().stream()
-                    .map(command -> CompletableFuture.supplyAsync(() -> executeCommand(middleware, deviceId, command), executor)
-                            .exceptionally(e -> {
-                                log.error("Error occurred while executing command, commandId: {}", command.getCommandId(), e);
-                                return new CommandResult(command.getCommandId(), makeErrorResponse("Unexpected executor error", "executorFailed"), 500);
-                            }))
-                    .toList();
-
-            // Wait for all futures to complete
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
-            // Collect results
-            futures.forEach(future -> {
-                try {
-                    result.addCommand(future.join());
-                } catch (Exception e) {
-                    log.error("Error occurred while collecting command result by joining future", e);
-                }
-            });
-
-            executor.shutdown();
-        } catch (Exception e) {
-            log.error("Error occurred while executing commands, middlewareId: {}, deviceId: {}", middleware.getId(), deviceId, e);
-        }
-
-        return result;
+    public void executeCommandsConcurrently(Middleware middleware, long deviceId, List<Command> commands) {
+        commands.forEach(command -> executor.submit(() -> {
+            CommandResult commandResult = executeCommand(middleware, deviceId, command);
+            CommandsResult result = new CommandsResult(commandResult);
+            vhrClient.saveCommands(middleware, result);
+        }));
     }
 
     private CommandResult executeCommand(Middleware middleware, long deviceId, Command command) {

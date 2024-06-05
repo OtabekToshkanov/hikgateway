@@ -32,31 +32,14 @@ public class DeviceWorker implements Runnable {
 
                 if (commands.getCommands().isEmpty()) return;
 
-                ////////////////////////////
-                /// CONCURRENT EXECUTION ///
-                ///        BEGIN         ///
-                ////////////////////////////
-
-                // run commands on Hik
-//                CommandsResult commandsResult = commandExecutor.executeCommandsConcurrently(middleware, deviceId, commands);
-
-                // send commands result to VHR
-//                vhrClient.saveCommands(middleware, commandsResult);
-
-                ////////////////////////////
-                /// CONCURRENT EXECUTION ///
-                ///         END          ///
-                ////////////////////////////
-
-                ////////////////////////////
-                ///   LINEAR EXECUTION   ///
-                ///        BEGIN         ///
-                ////////////////////////////
-                commandExecutor.executeCommands(middleware, deviceId, commands);
-                ////////////////////////////
-                ///   LINEAR EXECUTION   ///
-                ///         END          ///
-                ////////////////////////////
+                switch (commands.getOperationMode()) {
+                    case "parallel" -> commandExecutor.executeCommandsConcurrently(middleware, deviceId, commands.getCommands());
+                    case "sequential", "sequencial" -> commandExecutor.executeCommandsSequentially(middleware, deviceId, commands.getCommands());
+                    default -> {
+                        log.error("Invalid operation mode: {}", commands.getOperationMode());
+                        return;
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("Error occurred while executing commands for device, middlewareId: {}, deviceId: {}", middleware.getId(), deviceId, e);

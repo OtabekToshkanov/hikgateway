@@ -96,7 +96,7 @@ public class ApplicationScheduler {
         devices.forEach(device -> deviceStatuses.stream()
                 .filter(deviceStatus -> deviceStatus.devIndex.equals(device.getDeviceIndex()))
                 .findFirst()
-                .ifPresent(deviceStatus -> devicesInfo.addDeviceInfo(device.getId(), mapStatus(deviceStatus.status))));
+                .ifPresent(deviceStatus -> devicesInfo.addDeviceInfo(device.getVhrId(), mapStatus(deviceStatus.status))));
 
         return devicesInfo;
     }

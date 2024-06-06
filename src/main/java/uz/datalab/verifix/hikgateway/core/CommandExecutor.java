@@ -5,17 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import uz.datalab.verifix.hikgateway.client.hik.HikClient;
+import uz.datalab.verifix.hikgateway.client.hik.entity.HikErrorResponse;
 import uz.datalab.verifix.hikgateway.client.hik.entity.HikResult;
 import uz.datalab.verifix.hikgateway.client.hik.entity.HikUtil;
 import uz.datalab.verifix.hikgateway.client.hik.entity.deviceadd.response.DeviceAddResponse;
 import uz.datalab.verifix.hikgateway.client.hik.entity.devicedel.response.DeviceDelResponse;
 import uz.datalab.verifix.hikgateway.client.vhr.VHRClient;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Command;
+import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Commands;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.Photo;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.load.SetPhotoCommandBody;
 import uz.datalab.verifix.hikgateway.client.vhr.entity.save.CommandResult;
@@ -23,11 +26,11 @@ import uz.datalab.verifix.hikgateway.client.vhr.entity.save.CommandsResult;
 import uz.datalab.verifix.hikgateway.entity.Middleware;
 import uz.datalab.verifix.hikgateway.service.AppService;
 
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.*;
+import java.util.concurrent.*;
 
 @RequiredArgsConstructor
+@Setter
 @Component
 @Scope("prototype")
 public class CommandExecutor {
@@ -37,6 +40,8 @@ public class CommandExecutor {
     private final HikClient hikClient;
     private final ObjectMapper objectMapper;
     private ExecutorService executor;
+    private Middleware middleware;
+    private long deviceId;
 
     @PostConstruct
     public void init() {
@@ -48,29 +53,139 @@ public class CommandExecutor {
         executor.shutdown();
     }
 
-    public void executeCommandsSequentially(Middleware middleware, long deviceId, List<Command> commands) {
+    public boolean executeCommands(Commands commands) {
+        if (commands.getCommands() == null || commands.getCommands().isEmpty()) return false;
+
+        switch (commands.getOperationMode()) {
+            case "parallel" -> executeCommandsConcurrently(commands.getCommands(), commands.getDelayAttemptTimes());
+            case "sequential", "sequencial" -> executeCommandsSequentially(commands.getCommands());
+            default -> {
+                log.error("Invalid operation mode: {}", commands.getOperationMode());
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void executeCommandsConcurrently(List<Command> commands, int[] delayAttemptTimes) {
+        CompletionService<CommandResult> completionService = new ExecutorCompletionService<>(executor);
+        CountDownLatch latch = new CountDownLatch(commands.size());
+
+        commands.forEach(command -> completionService.submit(() -> {
+            try {
+                CommandResult commandResult = executeCommand(command);
+
+                // if command execution failed due to internal error or device busy, return commandId for retry
+                // otherwise save command result to VHR
+                try {
+                    if (commandResult.isPossibleInternalOrDeviceBusyError()) {
+                        HikErrorResponse errorResponse = objectMapper.readValue(commandResult.getCommandResult(), HikErrorResponse.class);
+
+                        if ("internalError".equals(errorResponse.getSubStatusCode()) ||
+                                "deviceBusy".equals(errorResponse.getSubStatusCode())) {
+                            return commandResult;
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+
+                vhrClient.saveCommands(middleware, new CommandsResult(commandResult));
+                return null;
+            } finally {
+                latch.countDown();
+            }
+        }));
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            log.error("Error occurred while waiting for command completion", e);
+            Thread.currentThread().interrupt();
+        }
+
+        List<CommandResult> failedCommandResults = new ArrayList<>();
+
+        for (int i = 0; i < commands.size(); i++) {
+            try {
+                Future<CommandResult> future = completionService.poll(1, TimeUnit.SECONDS);
+                if (future != null && future.get() != null)
+                    failedCommandResults.add(future.get());
+            } catch (InterruptedException | ExecutionException e) {
+                log.error("Error occurred while getting command result", e);
+            }
+        }
+
+        if (!failedCommandResults.isEmpty()) {
+            Map<String, Command> commandMap = new HashMap<>();
+            for (Command command : commands) {
+                commandMap.put(command.getCommandId(), command);
+            }
+
+            List<Command> failedCommands = failedCommandResults.stream()
+                    .map(commandResult -> commandMap.get(commandResult.getCommandId()))
+                    .filter(Objects::nonNull)
+                    .toList();
+
+            executeCommandsSequentiallyWithDelayAfterFail(failedCommands, failedCommandResults, delayAttemptTimes);
+        }
+    }
+
+    private void executeCommandsSequentiallyWithDelayAfterFail(List<Command> commands, List<CommandResult> failedCommandResults, int[] delayAttemptTimes) {
+        int delayIndex = 0;
+
+        for (int i = 0; i < commands.size(); i++) {
+            // if delay attempt times are exhausted, return error for remaining commands
+            if (delayIndex >= delayAttemptTimes.length || delayAttemptTimes[delayIndex] >= 15 * 60) {
+                CommandsResult result = new CommandsResult();
+
+                for (int j = i; j < commands.size(); j++) {
+//                    CommandResult commandResult = new CommandResult(commands.get(j).getCommandId());
+//                    prepareErrorCommandResult(commandResult, 400, "Internal error or device busy", "internalErrorOrDeviceBusy");
+//                    result.addCommand(commandResult);
+                    result.addCommand(failedCommandResults.get(j));
+                }
+
+                vhrClient.saveCommands(middleware, result);
+                break;
+            }
+
+            CommandResult commandResult = executeCommand(commands.get(i));
+
+            try {
+                if (commandResult.isPossibleInternalOrDeviceBusyError()) {
+                    HikErrorResponse errorResponse = objectMapper.readValue(commandResult.getCommandResult(), HikErrorResponse.class);
+
+                    if ("internalError".equals(errorResponse.getSubStatusCode()) ||
+                            "deviceBusy".equals(errorResponse.getSubStatusCode())) {
+                        Thread.sleep(delayAttemptTimes[delayIndex++] * 1000L);
+                        i--;
+                        continue;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+
+            CommandsResult result = new CommandsResult(commandResult);
+            vhrClient.saveCommands(middleware, result);
+        }
+    }
+
+    private void executeCommandsSequentially(List<Command> commands) {
         commands.forEach(command -> {
-            CommandResult commandResult = executeCommand(middleware, deviceId, command);
+            CommandResult commandResult = executeCommand(command);
             CommandsResult result = new CommandsResult(commandResult);
             vhrClient.saveCommands(middleware, result);
         });
     }
 
-    public void executeCommandsConcurrently(Middleware middleware, long deviceId, List<Command> commands) {
-        commands.forEach(command -> executor.submit(() -> {
-            CommandResult commandResult = executeCommand(middleware, deviceId, command);
-            CommandsResult result = new CommandsResult(commandResult);
-            vhrClient.saveCommands(middleware, result);
-        }));
-    }
-
-    private CommandResult executeCommand(Middleware middleware, long deviceId, Command command) {
+    private CommandResult executeCommand(Command command) {
         CommandResult commandResult = new CommandResult(command.getCommandId());
 
         try {
             switch (command.getExecutionMode()) {
-                case "transmission" -> executeTransmissionMode(command, commandResult, middleware, deviceId);
-                case "operation" -> executeOperationMode(command, commandResult, middleware);
+                case "transmission" -> executeTransmissionMode(command, commandResult);
+                case "operation" -> executeOperationMode(command, commandResult);
                 default -> {
                     log.warn("Command execution mode is not supported, commandId: {}, mode: {}", command.getCommandId(), command.getExecutionMode());
                     prepareErrorCommandResult(commandResult, 400, "Unsupported execution mode", "executionModeFailed");
@@ -84,7 +199,7 @@ public class CommandExecutor {
         return commandResult;
     }
 
-    private void executeTransmissionMode(Command command, CommandResult commandResult, Middleware middleware, long deviceId) {
+    private void executeTransmissionMode(Command command, CommandResult commandResult) {
         HikResult hikResult = hikClient.makeSimpleRequest(command.getCommandRoute(), command.getHttpMethod(), command.getCommandBody());
         prepareSuccessCommandResult(commandResult, hikResult.getCode(), hikResult.getOutput());
 
@@ -92,15 +207,15 @@ public class CommandExecutor {
 
         switch (command.getCommandCode()) {
             case "hikvision:device:add":
-                addDevice(middleware, deviceId, hikResult.getOutput());
+                addDevice(hikResult.getOutput());
                 break;
             case "hikvision:device:remove":
-                removeDevice(middleware, deviceId, hikResult.getOutput());
+                removeDevice(hikResult.getOutput());
                 break;
         }
     }
 
-    private void executeOperationMode(Command command, CommandResult commandResult, Middleware middleware) {
+    private void executeOperationMode(Command command, CommandResult commandResult) {
         if (command.getCommandCode().equals("hikvision:person:set_photo")) {
             SetPhotoCommandBody commandBody = objectMapper.convertValue(command.getCommandBody(), SetPhotoCommandBody.class);
             Photo photo = vhrClient.loadPhoto(middleware, commandBody.getFaceImage());
@@ -117,7 +232,7 @@ public class CommandExecutor {
         }
     }
 
-    private void addDevice(Middleware middleware, long deviceId, String hikResultOutput) {
+    private void addDevice(String hikResultOutput) {
         try {
             DeviceAddResponse response = objectMapper.readValue(hikResultOutput, DeviceAddResponse.class);
 
@@ -130,7 +245,7 @@ public class CommandExecutor {
         }
     }
 
-    private void removeDevice(Middleware middleware, long deviceId, String hikResultOutput) {
+    private void removeDevice(String hikResultOutput) {
         try {
             DeviceDelResponse response = objectMapper.readValue(hikResultOutput, DeviceDelResponse.class);
 

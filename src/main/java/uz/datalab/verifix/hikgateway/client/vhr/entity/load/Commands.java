@@ -3,12 +3,13 @@ package uz.datalab.verifix.hikgateway.client.vhr.entity.load;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
 public class Commands {
@@ -16,8 +17,8 @@ public class Commands {
     private List<Command> commands;
     @JsonProperty("operation_mode")
     private String operationMode;
-
-    public Commands() {
-        commands = new ArrayList<>();
-    }
+    @JsonProperty("delay_attempt_times")
+    private int[] delayAttemptTimes;
+    @JsonProperty("next_load_delay")
+    private int nextLoadDelay;
 }

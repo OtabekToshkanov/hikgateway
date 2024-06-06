@@ -26,20 +26,17 @@ public class DeviceWorker implements Runnable {
     @Override
     public void run() {
         try {
+            commandExecutor.setMiddleware(middleware);
+            commandExecutor.setDeviceId(deviceId);
+
             while (true) {
                 // load commands from VHR
                 Commands commands = vhrClient.loadCommands(middleware, deviceId);
+                // execute commands, return if failed
+                if (!commandExecutor.executeCommands(commands)) return;
 
-                if (commands.getCommands().isEmpty()) return;
-
-                switch (commands.getOperationMode()) {
-                    case "parallel" -> commandExecutor.executeCommandsConcurrently(middleware, deviceId, commands.getCommands());
-                    case "sequential", "sequencial" -> commandExecutor.executeCommandsSequentially(middleware, deviceId, commands.getCommands());
-                    default -> {
-                        log.error("Invalid operation mode: {}", commands.getOperationMode());
-                        return;
-                    }
-                }
+                // wait for next load delay
+                Thread.sleep(Math.min(commands.getNextLoadDelay(), 5 * 60) * 1000L);
             }
         } catch (Exception e) {
             log.error("Error occurred while executing commands for device, middlewareId: {}, deviceId: {}", middleware.getId(), deviceId, e);

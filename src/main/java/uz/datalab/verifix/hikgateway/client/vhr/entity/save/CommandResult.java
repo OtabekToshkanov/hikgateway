@@ -13,5 +13,9 @@ public class CommandResult {
     @JsonProperty("command_result")
     private String commandResult;
     @JsonProperty("response_code")
-    private long responseCode;
+    private int responseCode;
+
+    public boolean isPossibleInternalOrDeviceBusyError() {
+        return responseCode == 403 || responseCode == 503;
+    }
 }

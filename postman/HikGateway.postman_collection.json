@@ -1,0 +1,203 @@
+{
+	"info": {
+		"_postman_id": "9227f7fe-7489-4585-809d-93db49a6f16d",
+		"name": "HikGateway",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "6963976"
+	},
+	"item": [
+		{
+			"name": "Create Middleware",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"host\": \"http://192.168.10.11:8081/verifix_release\",\r\n    \"token\": \"20116A8A874A73A73DBCC6D9987EA1DC136DF22D4B72B86399BCFF44404D867B\",\r\n    \"username\": \"admin@verifix\",\r\n    \"password\": \"1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/v1/middleware",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"middleware"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get all Middlewares",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/api/v1/middleware",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"middleware"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Middleware by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/api/v1/middleware/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"middleware",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Middleware",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"id\": 2,\r\n    \"host\": \"http://192.168.10.11:8081/verifix_release\",\r\n    \"token\": \"20116A8A874A73A73DBCC6D9987EA1DC136DF22D4B72B86399BCFF44404D867B\",\r\n    \"username\": \"admin@head\",\r\n    \"password\": \"greenwhite\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/v1/middleware",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"middleware"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Middleware",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{host}}/api/v1/middleware/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"middleware",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Webhook trigger",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "token",
+						"value": "20116A8A874A73A73DBCC6D9987EA1DC136DF22D4B72B86399BCFF44404D867B",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"type\": \"verifix:devman:commandexists\",\r\n    \"timestamp\": 1716727259676,\r\n    \"data\": {\r\n        \"device_id\": 128,\r\n        \"id\": 19\r\n    }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/webhook/v1/device",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"webhook",
+						"v1",
+						"device"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "basic",
+		"basic": [
+			{
+				"key": "password",
+				"value": "secret",
+				"type": "string"
+			},
+			{
+				"key": "username",
+				"value": "admin",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "host",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

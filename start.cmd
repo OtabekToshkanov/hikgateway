@@ -1,0 +1,1 @@
+java -jar hikgateway-0.0.1.jar --spring.config.name=application

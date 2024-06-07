@@ -1,5 +1,6 @@
 package uz.datalab.verifix.hikgateway.client.vhr.entity.save;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
@@ -15,6 +16,7 @@ public class CommandResult {
     @JsonProperty("response_code")
     private int responseCode;
 
+    @JsonIgnore
     public boolean isPossibleInternalOrDeviceBusyError() {
         return responseCode == 403 || responseCode == 503;
     }

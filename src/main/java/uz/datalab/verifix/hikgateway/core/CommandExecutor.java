@@ -118,9 +118,7 @@ public class CommandExecutor {
 
         if (!failedCommandResults.isEmpty()) {
             Map<String, Command> commandMap = new HashMap<>();
-            for (Command command : commands) {
-                commandMap.put(command.getCommandId(), command);
-            }
+            commands.forEach(command -> commandMap.put(command.getCommandId(), command));
 
             List<Command> failedCommands = failedCommandResults.stream()
                     .map(commandResult -> commandMap.get(commandResult.getCommandId()))
@@ -139,12 +137,7 @@ public class CommandExecutor {
             if (delayIndex >= delayAttemptTimes.length || delayAttemptTimes[delayIndex] >= 15 * 60) {
                 CommandsResult result = new CommandsResult();
 
-                for (int j = i; j < commands.size(); j++) {
-//                    CommandResult commandResult = new CommandResult(commands.get(j).getCommandId());
-//                    prepareErrorCommandResult(commandResult, 400, "Internal error or device busy", "internalErrorOrDeviceBusy");
-//                    result.addCommand(commandResult);
-                    result.addCommand(failedCommandResults.get(j));
-                }
+                for (int j = i; j < commands.size(); j++) result.addCommand(failedCommandResults.get(j));
 
                 vhrClient.saveCommands(middleware, result);
                 break;

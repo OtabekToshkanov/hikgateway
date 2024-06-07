@@ -117,12 +117,15 @@ public class ApplicationScheduler {
     }
 
     @AllArgsConstructor
-    @NoArgsConstructor
     @Getter
     @Setter
     public static class DeviceStatuses {
         @JsonProperty("devices")
         private List<DeviceStatus> devicesStatuses;
+
+        public DeviceStatuses() {
+            devicesStatuses = new ArrayList<>();
+        }
 
         void addDeviceInfo(long deviceId, String status) {
             if (devicesStatuses == null)

@@ -9,3 +9,16 @@ public class HikgatewayApplication {
         SpringApplication.run(HikgatewayApplication.class, args);
     }
 }
+
+// Tomcat application build
+//@SpringBootApplication
+//public class HikgatewayApplication extends SpringBootServletInitializer {
+//    public static void main(String[] args) {
+//        SpringApplication.run(HikgatewayApplication.class, args);
+//    }
+//
+//    @Override
+//    protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+//        return application.sources(HikgatewayApplication.class);
+//    }
+//}

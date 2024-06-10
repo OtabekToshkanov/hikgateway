@@ -41,6 +41,7 @@ public class VHRClient {
             Request request = new Request.Builder()
                     .url(properties.loadCommandsUrl(middleware.getHost()))
                     .header("Authorization", "Basic " + middleware.getCredentials())
+                    .header(properties.middlewareRequestHeaderName(), middleware.getToken())
                     .post(body)
                     .build();
 
@@ -67,6 +68,7 @@ public class VHRClient {
             Request request = new Request.Builder()
                     .url(properties.saveCommandsResultUrl(middleware.getHost()))
                     .header("Authorization", "Basic " + middleware.getCredentials())
+                    .header(properties.middlewareRequestHeaderName(), middleware.getToken())
                     .post(body)
                     .build();
 
@@ -87,6 +89,7 @@ public class VHRClient {
             Request request = new Request.Builder()
                     .url(properties.loadPhotoUri(middleware.getHost(), faceImage.getPhotoSha(), faceImage.getWidth(), faceImage.getHeight(), faceImage.getFormat()))
                     .header("Authorization", "Basic " + middleware.getCredentials())
+                    .header(properties.middlewareRequestHeaderName(), middleware.getToken())
                     .get()
                     .build();
 
@@ -116,6 +119,7 @@ public class VHRClient {
             Request request = new Request.Builder()
                     .url(properties.middlewareHealthCheckUri(middleware.getHost()))
                     .header("Authorization", "Basic " + middleware.getCredentials())
+                    .header(properties.middlewareRequestHeaderName(), middleware.getToken())
                     .post(body)
                     .build();
 
@@ -138,6 +142,7 @@ public class VHRClient {
             Request request = new Request.Builder()
                     .url(properties.updateDevicesStatusUri(middleware.getHost()))
                     .header("Authorization", "Basic " + middleware.getCredentials())
+                    .header(properties.middlewareRequestHeaderName(), middleware.getToken())
                     .post(body)
                     .build();
 

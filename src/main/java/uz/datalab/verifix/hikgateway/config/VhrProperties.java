@@ -20,6 +20,7 @@ public class VhrProperties {
     private String loadPhotoUri;
     private String updateDevicesStatusUri;
     private String middlewareHealthCheckUri;
+    private String middlewareRequestHeaderName;
 
     public String loadCommandsUrl(String host) {
         return host + loadCommandsUri;
@@ -39,5 +40,9 @@ public class VhrProperties {
 
     public String middlewareHealthCheckUri(String host) {
         return host + middlewareHealthCheckUri;
+    }
+
+    public String middlewareRequestHeaderName() {
+        return middlewareRequestHeaderName == null || middlewareRequestHeaderName.isBlank() ? "vhr-gateway" : middlewareRequestHeaderName;
     }
 }
